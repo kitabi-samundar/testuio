@@ -215,7 +215,7 @@ async def stream_proxy(request: Request) -> StreamingResponse:
 
     async def _generate():
         loop = asyncio.get_event_loop()
-        q: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=64)
+        q: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=256)
         stop = threading.Event()
 
         def _fetch() -> None:
@@ -238,7 +238,7 @@ async def stream_proxy(request: Request) -> StreamingResponse:
                         if chunk:
                             fut = asyncio.run_coroutine_threadsafe(q.put(chunk), loop)
                             try:
-                                fut.result(timeout=15)
+                                fut.result(timeout=60)
                             except Exception:
                                 break
             except Exception as exc:
