@@ -138,21 +138,42 @@ class YouTubeExtractor:
             "nocheckcertificate": True,
             "geo_bypass": True,
             "http_headers": {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Accept-Language": "en-US,en;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             },
             "extractor_args": {
                 "youtube": {
-                    # tv_embedded is treated as an embedded player — much less
-                    # aggressive bot-detection from cloud IPs than android/web.
-                    "player_client": ["tv_embedded", "ios", "android"],
+                    # Multi-client approach to bypass bot detection:
+                    # - tv_embedded: Least aggressive bot detection (best for cloud IPs)
+                    # - ios: Mobile client, less bot checking
+                    # - web: Standard web client (needs fresh cookies)
+                    # - mweb: Mobile web (alternative path)
+                    "player_client": ["tv_embedded", "ios", "mweb", "web"],
                     "skip": ["hls", "dash"],
                 }
             },
+            # Timeout between retries for rate limit handling
+            "socket_timeout": settings.ytdlp_timeout,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["tv_embedded", "ios", "mweb", "web"],
+                    "skip": ["hls", "dash"],
+                    "age_gate": True,  # Handle age-gated content
+                }
+            },
         }
+        
         if os.path.exists(COOKIES_PATH):
             self._base_opts["cookies"] = COOKIES_PATH
             logger.info("Using YouTube cookies from %s", COOKIES_PATH)
+            
+            # Add extra headers when cookies are available to appear more legitimate
+            self._base_opts["http_headers"].update({
+                "Accept-Encoding": "gzip, deflate",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+            })
 
         if settings.proxy_url:
             self._base_opts["proxy"] = settings.proxy_url
@@ -355,7 +376,6 @@ class YouTubeExtractor:
             "https://iv.datura.network",
             "https://iv.nboeck.de",
             "https://iv.melmac.space",
-            "https://iv.nboeck.de",
             "https://y.com.sb",
         ]
         random.shuffle(instances)
