@@ -62,6 +62,62 @@ async def debug_env() -> dict:
     }
 
 
+@router.get("/debug/cookies-analysis", dependencies=[Depends(_require_debug_secret)])
+async def debug_cookies_analysis() -> dict:
+    """Analyze loaded YouTube cookies: count, domains, and sample names."""
+    from pathlib import Path
+    
+    cookies_path = Path("/tmp/youtube_cookies.txt")
+    if not cookies_path.exists():
+        return {
+            "status": "no_cookies_file",
+            "message": "Cookies file not found at /tmp/youtube_cookies.txt",
+            "total_entries": 0,
+            "domains": [],
+            "sample_cookie_names": [],
+        }
+    
+    try:
+        content = cookies_path.read_text(encoding="utf-8")
+        lines = [line.strip() for line in content.split('\n') if line.strip() and not line.startswith('#')]
+        
+        domains = set()
+        cookie_names = []
+        
+        for line in lines:
+            parts = line.split('\t')
+            if len(parts) >= 6:
+                domain = parts[0]
+                cookie_name = parts[5]
+                domains.add(domain)
+                if len(cookie_names) < 10:  # Sample first 10 cookie names
+                    cookie_names.append(f"{domain}: {cookie_name}")
+        
+        has_youtube = any('.youtube.com' in d for d in domains)
+        has_googlevideo = any('googlevideo' in d for d in domains)
+        
+        return {
+            "status": "ok",
+            "total_entries": len(lines),
+            "total_domains": len(domains),
+            "domains": sorted(list(domains)),
+            "has_youtube_domain": has_youtube,
+            "has_googlevideo_domain": has_googlevideo,
+            "sample_cookie_names": cookie_names,
+            "recommendation": (
+                "✓ Cookies loaded correctly" if has_youtube and has_googlevideo
+                else "⚠️ Missing critical YouTube domains. Re-export fresh cookies from youtube.com (logged in)"
+            ),
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "message": str(exc),
+            "total_entries": 0,
+            "domains": [],
+        }
+
+
 @router.get("/debug/logs", dependencies=[Depends(_require_debug_secret)])
 async def debug_logs(lines: int = 100) -> dict:
     """Return tail of local log files for debugging Railway/FFmpeg issues."""
