@@ -72,10 +72,37 @@ class CookiesValidator:
         return True, None
 
     @staticmethod
-    def has_youtube_cookies(content: str) -> bool:
-        """Check if cookies contain YouTube-related domains."""
+    def has_youtube_cookies(content: str) -> tuple[bool, list[str]]:
+        """
+        Check if cookies contain YouTube-related domains.
+        
+        Returns:
+            (has_youtube, list_of_youtube_domains_found)
+        """
         youtube_domains = ('.youtube.com', '.googlevideo.com', 'youtube.com', 'googlevideo.com')
-        return any(domain in content for domain in youtube_domains)
+        found_domains = set()
+        
+        for line in content.split('\n'):
+            line = line.strip()
+            if line and not line.startswith('#'):
+                for domain in youtube_domains:
+                    if domain in line:
+                        # Extract domain from line
+                        parts = line.split()
+                        if parts:
+                            found_domains.add(parts[0])
+        
+        return len(found_domains) > 0, sorted(list(found_domains))
+
+    @staticmethod
+    def count_cookies(content: str) -> int:
+        """Count valid cookie entries."""
+        count = 0
+        for line in content.split('\n'):
+            line = line.strip()
+            if line and not line.startswith('#'):
+                count += 1
+        return count
 
 
 class CookiesManager:
@@ -129,9 +156,21 @@ class CookiesManager:
                 logger.error(f"Invalid cookies format from {source}: {error}")
                 return False
 
-            # Warn if no YouTube cookies found
-            if not self.validator.has_youtube_cookies(raw_cookies):
-                logger.warning(f"Cookies from {source} don't contain YouTube domains")
+            # Check for YouTube cookies
+            has_yt_cookies, yt_domains = self.validator.has_youtube_cookies(raw_cookies)
+            cookie_count = self.validator.count_cookies(raw_cookies)
+            
+            if not has_yt_cookies:
+                logger.warning(
+                    f"⚠️  Cookies from {source} don't contain YouTube domains! "
+                    f"Found {cookie_count} cookies but no .youtube.com or .googlevideo.com entries. "
+                    f"Re-export cookies from a logged-in YouTube tab."
+                )
+            else:
+                logger.info(
+                    f"YouTube cookies loaded: {cookie_count} entries, "
+                    f"{len(yt_domains)} YouTube domain(s): {', '.join(yt_domains)}"
+                )
 
             Path(self.cookies_path).write_text(raw_cookies, encoding="utf-8")
             logger.info(f"YouTube cookies written from {source} to {self.cookies_path}")
