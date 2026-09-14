@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import os
 import random
 import re
@@ -13,6 +12,7 @@ import yt_dlp
 from app.config.settings import settings
 from app.logger.setup import get_logger
 from app.models.schemas import TrackInfo
+from app.youtube.cookies import CookiesManager
 
 logger = get_logger("ytdlp")
 
@@ -26,40 +26,24 @@ _COOKIES_B64_FILE = os.path.join(
 
 
 def _write_cookies() -> None:
-    """Write raw cookies from env, or decode the legacy Base64 option."""
-    raw_cookies: str | None = settings.youtube_cookies
-
-    if raw_cookies:
-        try:
-            with open(COOKIES_PATH, "w", encoding="utf-8") as f:
-                f.write(raw_cookies)
-            logger.info("YouTube cookies written from YOUTUBE_COOKIES")
-            return
-        except Exception as exc:
-            logger.error(f"Failed to write YOUTUBE_COOKIES: {exc}")
-            return
-
-    raw_b64: str | None = settings.youtube_cookies_b64
-
-    # Keep the legacy Base64 option and local file fallback for compatibility.
-    if not raw_b64 and os.path.exists(_COOKIES_B64_FILE):
-        try:
-            raw_b64 = open(_COOKIES_B64_FILE, "r", encoding="utf-8").read().strip()
-            logger.info("YOUTUBE_COOKIES_B64 not set; loaded cookies from cookies_b64.txt")
-        except Exception as exc:
-            logger.error(f"Failed to read cookies_b64.txt: {exc}")
-
-    if not raw_b64:
-        logger.warning("No YouTube cookies available (env var not set, cookies_b64.txt missing)")
-        return
-
-    try:
-        raw = base64.b64decode(raw_b64).decode("utf-8", errors="replace")
-        with open(COOKIES_PATH, "w", encoding="utf-8") as f:
-            f.write(raw)
-        logger.info("YouTube cookies file written to %s", COOKIES_PATH)
-    except Exception as exc:
-        logger.error(f"Failed to write YouTube cookies: {exc}")
+    """
+    Write raw cookies from env, or decode the legacy Base64 option.
+    
+    Priority:
+    1. YOUTUBE_COOKIES env var (raw Netscape format)
+    2. YOUTUBE_COOKIES_B64 env var (base64 encoded)
+    3. cookies_b64.txt file (fallback)
+    """
+    cookies_manager = CookiesManager(cookies_path=COOKIES_PATH)
+    success = cookies_manager.load_from_env_or_file(
+        env_var_raw="YOUTUBE_COOKIES",
+        env_var_b64="YOUTUBE_COOKIES_B64",
+        fallback_file=_COOKIES_B64_FILE,
+    )
+    if success:
+        logger.info("YouTube cookies loaded successfully for yt-dlp")
+    else:
+        logger.warning("No YouTube cookies available; some content may be inaccessible")
 
 
 # Write cookies once at module load so all yt-dlp instances use them.
