@@ -30,6 +30,7 @@ A production-grade internet radio backend that streams YouTube audio directly to
 Managed through Replit environment variables (shared). Required/sensitive:
 
 - `ICECAST_PASSWORD` — source password (stored as a Replit Secret)
+- `YOUTUBE_COOKIES` — raw Netscape-format `cookies.txt` contents (stored as a Replit Secret)
 
 Other non-secret vars are set in Replit env, including `ICECAST_HOST`, `ICECAST_PORT`, `ICECAST_MOUNT`, `AUTODJ_PLAYLISTS`, `AUDIO_BITRATE`, etc. See `.env.example` in the source for the full list.
 
@@ -64,7 +65,7 @@ iOS AVFoundation cannot use the Icecast ICY protocol on port 8000. A `/stream` p
 
 - Icecast XML and the FastAPI backend both expect the same `ICECAST_PASSWORD`. If you change one, change the other and restart the workflow.
 - The iOS-friendly stream mount was added to `icecast-replit.xml` with a larger `burst-size` and `client-timeout` to reduce rebuffering on mobile networks.
-- YouTube cookies can be supplied via the `YOUTUBE_COOKIES_B64` env var, but they are ignored when `YOUTUBE_OAUTH2_TOKEN_B64` is present because OAuth2 is the only reliable method from cloud IPs.
+- YouTube cookies can be supplied directly via the `YOUTUBE_COOKIES` secret using the raw Netscape `cookies.txt` contents. `YOUTUBE_COOKIES_B64` remains supported for compatibility.
 
 ## Pointers
 

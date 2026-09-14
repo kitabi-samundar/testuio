@@ -28,10 +28,22 @@ _COOKIES_B64_FILE = os.path.join(
 
 
 def _write_cookies() -> None:
-    """Decode base64 cookies from env (or cookies_b64.txt fallback) and write for yt-dlp."""
+    """Write raw cookies from env, or decode the legacy Base64 option."""
+    raw_cookies: str | None = settings.youtube_cookies
+
+    if raw_cookies:
+        try:
+            with open(COOKIES_PATH, "w", encoding="utf-8") as f:
+                f.write(raw_cookies)
+            logger.info("YouTube cookies written from YOUTUBE_COOKIES")
+            return
+        except Exception as exc:
+            logger.error(f"Failed to write YOUTUBE_COOKIES: {exc}")
+            return
+
     raw_b64: str | None = settings.youtube_cookies_b64
 
-    # Fall back to the committed cookies_b64.txt file if the env var isn't set
+    # Keep the legacy Base64 option and local file fallback for compatibility.
     if not raw_b64 and os.path.exists(_COOKIES_B64_FILE):
         try:
             raw_b64 = open(_COOKIES_B64_FILE, "r", encoding="utf-8").read().strip()

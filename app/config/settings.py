@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     ytdlp_format: str = Field("best", alias="YTDLP_FORMAT")
     ytdlp_max_duration: int = Field(7200, alias="YTDLP_MAX_DURATION")
     ytdlp_timeout: int = Field(30, alias="YTDLP_TIMEOUT")
+    youtube_cookies: Optional[str] = Field(None, alias="YOUTUBE_COOKIES")
     youtube_cookies_b64: Optional[str] = Field(None, alias="YOUTUBE_COOKIES_B64")
     youtube_oauth2_token_b64: Optional[str] = Field(None, alias="YOUTUBE_OAUTH2_TOKEN_B64")
     proxy_url: Optional[str] = Field(None, alias="PROXY_URL")

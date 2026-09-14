@@ -49,11 +49,14 @@ def _require_debug_secret(x_api_secret: str | None = Header(None, alias="X-API-S
 
 @router.get("/debug/env", dependencies=[Depends(_require_debug_secret)])
 async def debug_env() -> dict:
-    """Return whether YOUTUBE_COOKIES_B64 is set (value hidden)."""
-    has_cookies = bool(settings.youtube_cookies_b64)
+    """Return whether YouTube cookies are set (values hidden)."""
+    has_raw_cookies = bool(settings.youtube_cookies)
+    has_cookies = has_raw_cookies or bool(settings.youtube_cookies_b64)
     return {
+        "youtube_cookies_set": has_raw_cookies,
+        "youtube_cookies_length": len(settings.youtube_cookies) if has_raw_cookies else 0,
         "youtube_cookies_b64_set": has_cookies,
-        "youtube_cookies_b64_length": len(settings.youtube_cookies_b64) if has_cookies else 0,
+        "youtube_cookies_b64_length": len(settings.youtube_cookies_b64) if settings.youtube_cookies_b64 else 0,
         "youtube_oauth2_token_b64_set": bool(settings.youtube_oauth2_token_b64),
         "youtube_oauth2_token_b64_length": len(settings.youtube_oauth2_token_b64) if settings.youtube_oauth2_token_b64 else 0,
         "youtube_oauth2_cache_file_present": os.path.exists(OAUTH2_TOKEN_CACHE_FILE),
@@ -215,7 +218,7 @@ async def stream_proxy(request: Request) -> StreamingResponse:
 
     async def _generate():
         loop = asyncio.get_event_loop()
-        q: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=256)
+        q: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=64)
         stop = threading.Event()
 
         def _fetch() -> None:
@@ -238,7 +241,7 @@ async def stream_proxy(request: Request) -> StreamingResponse:
                         if chunk:
                             fut = asyncio.run_coroutine_threadsafe(q.put(chunk), loop)
                             try:
-                                fut.result(timeout=60)
+                                fut.result(timeout=15)
                             except Exception:
                                 break
             except Exception as exc:
