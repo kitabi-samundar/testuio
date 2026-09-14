@@ -32,7 +32,7 @@ from app.models.schemas import (
 )
 from app.player.controller import player
 from app.queue.manager import queue_manager
-from app.youtube.extractor import ExtractionError, OAUTH2_TOKEN_CACHE_FILE, SkippableError, extractor
+from app.youtube.extractor import ExtractionError, SkippableError, extractor
 
 logger = get_logger("api")
 router = APIRouter()
@@ -57,9 +57,6 @@ async def debug_env() -> dict:
         "youtube_cookies_length": len(settings.youtube_cookies) if has_raw_cookies else 0,
         "youtube_cookies_b64_set": has_cookies,
         "youtube_cookies_b64_length": len(settings.youtube_cookies_b64) if settings.youtube_cookies_b64 else 0,
-        "youtube_oauth2_token_b64_set": bool(settings.youtube_oauth2_token_b64),
-        "youtube_oauth2_token_b64_length": len(settings.youtube_oauth2_token_b64) if settings.youtube_oauth2_token_b64 else 0,
-        "youtube_oauth2_cache_file_present": os.path.exists(OAUTH2_TOKEN_CACHE_FILE),
         "ytdlp_format": settings.ytdlp_format,
         "ytdlp_timeout": settings.ytdlp_timeout,
     }

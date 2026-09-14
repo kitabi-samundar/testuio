@@ -1,6 +1,7 @@
 .env
 attached_assets/*cookies*.txt
 attached_assets/*Netscape*.txt
+attached_assets/*logs*.txt
 .cache/
 .local/
 .pythonlibs/

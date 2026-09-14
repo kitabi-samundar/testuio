@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import json
 import os
 import random
 import re
@@ -10,7 +9,6 @@ from typing import Any, Dict, List, Optional
 
 import requests
 import yt_dlp
-from app.youtube.oauth_patch import _apply_youtube_oauth_patch
 
 from app.config.settings import settings
 from app.logger.setup import get_logger
@@ -66,40 +64,6 @@ def _write_cookies() -> None:
 
 # Write cookies once at module load so all yt-dlp instances use them.
 _write_cookies()
-
-# Apply the runtime patch to the yt-dlp-youtube-oauth2 plugin before it is used.
-_apply_youtube_oauth_patch()
-
-OAUTH2_TOKEN_CACHE_FILE = os.path.expanduser("~/.cache/yt-dlp/youtube-oauth2/token_data.json")
-
-
-def _write_oauth2_token() -> None:
-    """Decode a base64-encoded OAuth2 token from env and prime the yt-dlp cache.
-
-    The yt-dlp-youtube-oauth2 plugin stores tokens in yt-dlp's cache. By
-    writing the env-provided token to the same location, the plugin can load it
-    automatically and refresh the access token as needed without prompting for a
-    device code on every startup.
-    """
-    raw_b64: str | None = settings.youtube_oauth2_token_b64
-    if not raw_b64:
-        return
-    try:
-        token_data = json.loads(base64.b64decode(raw_b64).decode("utf-8"))
-        required = ("access_token", "expires", "refresh_token", "token_type")
-        if not all(k in token_data for k in required):
-            logger.warning("YOUTUBE_OAUTH2_TOKEN_B64 is missing required keys; ignoring")
-            return
-        # Store in the plugin's cache location so it is loaded automatically.
-        with yt_dlp.YoutubeDL({"quiet": True, "cachedir": os.path.expanduser("~/.cache/yt-dlp")}) as ydl:
-            ydl.cache.store("youtube-oauth2", "token_data", token_data)
-        logger.info("YouTube OAuth2 token loaded from environment into yt-dlp cache")
-    except Exception as exc:
-        logger.error(f"Failed to load YouTube OAuth2 token: {exc}")
-
-
-# Prime the OAuth2 token cache at module load so extractions can use it.
-_write_oauth2_token()
 
 PRIVATE_ERRORS = (
     "private video",
@@ -202,20 +166,9 @@ class YouTubeExtractor:
                 }
             },
         }
-        oauth2_token_present = bool(settings.youtube_oauth2_token_b64) or os.path.exists(OAUTH2_TOKEN_CACHE_FILE)
-        if oauth2_token_present:
-            # OAuth2 is the only auth method that reliably bypasses YouTube's
-            # cloud-IP bot checks. It manages its own Authorization header, so
-            # do not pass cookies at the same time.
-            self._base_opts["username"] = "oauth2"
-            self._base_opts["password"] = ""
-            # Authenticated web client gives the richest format selection.
-            self._base_opts["extractor_args"]["youtube"]["player_client"] = ["web", "ios", "android"]
-            logger.info("Using YouTube OAuth2 authentication")
-        else:
-            if os.path.exists(COOKIES_PATH):
-                self._base_opts["cookies"] = COOKIES_PATH
-                logger.info("Using YouTube cookies from %s", COOKIES_PATH)
+        if os.path.exists(COOKIES_PATH):
+            self._base_opts["cookies"] = COOKIES_PATH
+            logger.info("Using YouTube cookies from %s", COOKIES_PATH)
 
         if settings.proxy_url:
             self._base_opts["proxy"] = settings.proxy_url

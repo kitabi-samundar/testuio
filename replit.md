@@ -38,24 +38,11 @@ Other non-secret vars are set in Replit env, including `ICECAST_HOST`, `ICECAST_
 
 - None yet — populate here as the user gives explicit guidance.
 
-## OAuth2 setup (required for YouTube playback from cloud IPs)
+## YouTube cookies
 
-YouTube blocks Replit/Railway datacenter IPs with a "Sign in to confirm you're not a bot" screen. Cookies alone do not bypass this. The only reliable fix is OAuth2 device-code authentication:
-
-1. Open the **Shell** tab and generate a device code:
-   ```bash
-   python3 setup_youtube_oauth.py generate
-   ```
-2. Visit the URL it prints and enter the device code.
-3. Once approved, retrieve the token:
-   ```bash
-   python3 setup_youtube_oauth.py finish
-   ```
-4. Copy the printed `YOUTUBE_OAUTH2_TOKEN_B64` value.
-5. Add it as a **Replit Secret** (and a Railway variable) named `YOUTUBE_OAUTH2_TOKEN_B64`.
-6. Restart the `Start application` workflow.
-
-The token is refreshable, so the one-time setup keeps working. `YOUTUBE_COOKIES_B64` is ignored when OAuth2 is configured.
+YouTube playback uses the raw Netscape-format cookie export stored in the
+`YOUTUBE_COOKIES` secret. OAuth2 authentication is not used by the application.
+Restart the service after updating the secret.
 
 ## iOS / Safari stream
 

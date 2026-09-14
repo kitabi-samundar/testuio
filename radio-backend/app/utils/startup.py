@@ -114,21 +114,31 @@ def verify_internet() -> None:
 
 def verify_cookies() -> None:
     from app.config.settings import settings
-    if settings.youtube_cookies_b64:
+    if settings.youtube_cookies:
+        raw = settings.youtube_cookies
+        source = "YOUTUBE_COOKIES"
+    elif settings.youtube_cookies_b64:
         try:
             import base64
             raw = base64.b64decode(settings.youtube_cookies_b64).decode("utf-8", errors="replace")
+            source = "YOUTUBE_COOKIES_B64"
+        except Exception as exc:
+            logger.error(f"✗ Failed to decode YOUTUBE_COOKIES_B64: {exc}")
+            return
+    else:
+        logger.warning("⚠ YOUTUBE_COOKIES not set — YouTube extractions may fail on cloud IPs")
+        return
+
+    try:
             lines = [l for l in raw.splitlines() if l.strip() and not l.startswith("#")]
             domains = set()
             for line in lines:
                 parts = line.split("\t")
                 if len(parts) >= 3:
                     domains.add(parts[0].strip())
-            logger.info(f"✓ YOUTUBE_COOKIES_B64 loaded ({len(lines)} entries, {len(domains)} domains)")
-        except Exception as exc:
-            logger.error(f"✗ Failed to decode YOUTUBE_COOKIES_B64: {exc}")
-    else:
-        logger.warning("⚠ YOUTUBE_COOKIES_B64 not set — YouTube extractions may fail on cloud IPs")
+            logger.info(f"✓ {source} loaded ({len(lines)} entries, {len(domains)} domains)")
+    except Exception as exc:
+        logger.error(f"✗ Failed to validate {source}: {exc}")
 
 
 def detect_environment() -> None:
