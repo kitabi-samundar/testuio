@@ -19,8 +19,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     icecast2 \
     supervisor \
     nginx \
-    nodejs \
     && rm -rf /var/lib/apt/lists/*
+
+# yt-dlp's current Node challenge provider requires a modern Node permission
+# runtime. Debian's base repository may provide an older Node release, so use
+# the current Node 24 LTS line explicitly.
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

@@ -152,7 +152,7 @@ class YouTubeExtractor:
                     "age_gate": True,  # Handle age-gated content
                 }
             },
-            "js_runtimes": {"node": {}},
+            "js_runtimes": {"node": {"path": "/usr/bin/node"}},
             "remote_components": ["ejs:github"],
         }
         
@@ -181,6 +181,12 @@ class YouTubeExtractor:
                 "Connection": "keep-alive",
                 "Upgrade-Insecure-Requests": "1",
             })
+
+        # Current yt-dlp clients such as ios and android_vr cannot be used
+        # with a cookie file. Keep cookie mode on the compatible web client so
+        # yt-dlp does not silently discard the authenticated request paths.
+        if "cookiefile" in self._base_opts or "cookiesfrombrowser" in self._base_opts:
+            self._base_opts["extractor_args"]["youtube"]["player_client"] = ["web_safari"]
 
         if settings.proxy_url:
             self._base_opts["proxy"] = settings.proxy_url

@@ -11,7 +11,16 @@ mkdir -p "${LOG_DIR:-/app/logs}"
 
 echo "[start.sh] Python: $(python --version)"
 echo "[start.sh] FFmpeg: $(ffmpeg -version 2>&1 | head -1)"
+echo "[start.sh] Node: $(node --version 2>&1)"
 echo "[start.sh] yt-dlp: $(python -m yt_dlp --version 2>&1 | head -1)"
+python - <<'PY'
+try:
+    import importlib.metadata
+    import yt_dlp_ejs
+    print(f"[start.sh] yt-dlp-ejs: {importlib.metadata.version('yt-dlp-ejs')}")
+except Exception as exc:
+    raise SystemExit(f"[start.sh] ERROR: yt-dlp-ejs is not usable: {exc}")
+PY
 
 # ── Internal Icecast password ─────────────────────────────────────────────────
 # Generate a clean random hex password so there are no special characters that
