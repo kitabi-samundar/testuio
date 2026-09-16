@@ -159,16 +159,32 @@ class YouTubeExtractor:
             },
             "extractor_args": {
                 "youtube": {
-                    # tv_embedded is treated as an embedded player — much less
-                    # aggressive bot-detection from cloud IPs than android/web.
-                    "player_client": ["tv_embedded", "ios", "android"],
+                    # tv_embedded is not supported by current yt-dlp releases.
+                    "player_client": ["web_safari", "ios", "android_vr"],
                     "skip": ["hls", "dash"],
                 }
             },
+            "js_runtimes": {"node": {}},
+            "remote_components": ["ejs:github"],
         }
-        if os.path.exists(COOKIES_PATH):
-            self._base_opts["cookies"] = COOKIES_PATH
+        configured_cookie_file = (settings.ytdlp_cookie_file or "").strip()
+        configured_browser = (settings.ytdlp_browser or "").strip()
+        if configured_cookie_file:
+            if not os.path.isfile(configured_cookie_file):
+                raise FileNotFoundError(
+                    f"YTDLP_COOKIE_FILE does not exist: {configured_cookie_file}"
+                )
+            self._base_opts["cookiefile"] = configured_cookie_file
+            logger.info("Using YouTube cookies from configured file")
+        elif os.path.exists(COOKIES_PATH):
+            self._base_opts["cookiefile"] = COOKIES_PATH
             logger.info("Using YouTube cookies from %s", COOKIES_PATH)
+        elif configured_browser:
+            # This only works when the browser profile exists on the same
+            # machine/container running yt-dlp. It cannot access a developer's
+            # local Brave profile from Railway.
+            self._base_opts["cookiesfrombrowser"] = (configured_browser,)
+            logger.info("Using YouTube cookies from local browser: %s", configured_browser)
 
         if settings.proxy_url:
             self._base_opts["proxy"] = settings.proxy_url

@@ -1,0 +1,74 @@
+Here is the exact way it is hooked up between `.env` and Python so you can drop it into any of your other projects or scripts:
+
+---
+
+### 1. In your `.env` file
+
+Add these keys:
+
+```dotenv
+# Name of the browser (e.g., brave, chrome, firefox, edge)
+# Leave blank to run without cookies
+YTDLP_BROWSER=brave
+
+# Optional: Netscape cookies file (takes priority over browser)
+YTDLP_COOKIE_FILE=
+```
+
+---
+
+### 2. In your Python code
+
+Load `.env` and pass `cookiesfrombrowser` into `yt_dlp.YoutubeDL()` options:
+
+```python
+import os
+from dotenv import load_dotenv
+import yt_dlp
+
+# Load environment variables from .env
+load_dotenv()
+
+BROWSER = os.getenv("YTDLP_BROWSER", "").strip()
+COOKIE_FILE = os.getenv("YTDLP_COOKIE_FILE", "").strip()
+
+def get_ytdlp_options():
+    options = {
+        "format": "bestaudio/best",
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": True,
+        "default_search": "ytsearch1",
+        "socket_timeout": 20,
+        "retries": 3,
+        "cachedir": False,
+    }
+
+    # Priority 1: Use cookies.txt if provided
+    if COOKIE_FILE:
+        if not os.path.isfile(COOKIE_FILE):
+            raise RuntimeError(f"Cookie file '{COOKIE_FILE}' not found.")
+        options["cookiefile"] = COOKIE_FILE
+
+    # Priority 2: Read cookies directly from the browser
+    elif BROWSER:
+        # yt-dlp expects a tuple, e.g. ("brave",) or ("brave", "Default")
+        options["cookiesfrombrowser"] = (BROWSER,)
+
+    return options
+
+
+def extract_stream(query: str):
+    ydl_opts = get_ytdlp_options()
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(query, download=False)
+        return info
+```
+
+---
+
+### How it works:
+1. `yt-dlp` natively has an option called **`cookiesfrombrowser`**.
+2. Passing `(BROWSER,)` (which evaluates to `("brave",)`) tells `yt-dlp`:
+   > *"Locate the Brave cookie database on this machine, decrypt the session cookies, and attach them as HTTP headers when requesting YouTube video info."*
+3. If `YTDLP_BROWSER` is empty in `.env`, `options["cookiesfrombrowser"]` is simply skipped, and it streams without cookies.
