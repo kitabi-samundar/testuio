@@ -164,7 +164,11 @@ class PlayerController:
         if not is_silence:
             icecast_connector.update_metadata(track.title)
 
-        started = audio_pipeline.play(track.url, track_title=track.title)
+        started = audio_pipeline.play(
+            track.url,
+            track_title=track.title,
+            stream_headers=track.stream_headers,
+        )
         if not started:
             logger.error(f"Audio pipeline failed to feed track {track.title!r}")
             with self._lock:

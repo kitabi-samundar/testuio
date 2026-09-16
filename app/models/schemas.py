@@ -31,6 +31,14 @@ class TrackInfo(BaseModel):
     url: str
     thumbnail: str
     requested_by: str = "API"
+    # Headers returned by yt-dlp are needed when FFmpeg opens the resolved
+    # CDN URL. Keep them out of API responses because they are transport
+    # details and may contain short-lived request values.
+    stream_headers: dict[str, str] = Field(
+        default_factory=dict,
+        exclude=True,
+        repr=False,
+    )
 
 
 class NowPlayingResponse(BaseModel):

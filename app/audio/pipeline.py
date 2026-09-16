@@ -149,9 +149,15 @@ class AudioEncoder:
 class TrackDecoder:
     """Per-track ffmpeg that reads a YouTube URL and outputs raw PCM to stdout."""
 
-    def __init__(self, audio_url: str, track_title: str) -> None:
+    def __init__(
+        self,
+        audio_url: str,
+        track_title: str,
+        stream_headers: Optional[dict[str, str]] = None,
+    ) -> None:
         self.audio_url = audio_url
         self.track_title = track_title
+        self.stream_headers = dict(stream_headers or {})
         self._process: Optional[subprocess.Popen] = None
         self._lock = threading.Lock()
 
@@ -227,6 +233,18 @@ class TrackDecoder:
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/120.0.0.0 Safari/537.36"
         )
+        headers = {
+            "User-Agent": user_agent,
+            "Accept-Language": "en-US,en;q=0.9",
+            "Origin": "https://www.youtube.com",
+            "Referer": "https://www.youtube.com/",
+        }
+        headers.update(self.stream_headers)
+        headers_block = "".join(
+            f"{name}: {value}\r\n"
+            for name, value in headers.items()
+            if name.lower() not in {"content-length", "host"}
+        )
         return [
             settings.ffmpeg_path,
             "-hide_banner",
@@ -238,11 +256,8 @@ class TrackDecoder:
             "-reconnect_on_network_error", "1",
             "-reconnect_on_http_error", "5xx,403",
             "-timeout", "30000000",
-            "-user_agent", user_agent,
             "-headers",
-            "Accept-Language: en-US,en;q=0.9\r\n"
-            "Origin: https://www.youtube.com\r\n"
-            "Referer: https://www.youtube.com/\r\n",
+            headers_block,
             "-multiple_requests", "1",
             "-seekable", "0",
             "-i", self.audio_url,
@@ -297,14 +312,19 @@ class AudioPipeline:
         if self._encoder_writer_thread and self._encoder_writer_thread.is_alive():
             self._encoder_writer_thread.join(timeout=5)
 
-    def play(self, audio_url: str, track_title: str) -> bool:
+    def play(
+        self,
+        audio_url: str,
+        track_title: str,
+        stream_headers: Optional[dict[str, str]] = None,
+    ) -> bool:
         self._stop_decoder()
         self._track_finished.clear()
         self._encoder_error.clear()
         with self._lock:
             self._generation += 1
             self._current_title = track_title
-        decoder = TrackDecoder(audio_url, track_title)
+        decoder = TrackDecoder(audio_url, track_title, stream_headers=stream_headers)
         if not decoder.start():
             logger.error(f"Failed to start track decoder for {track_title!r}")
             self._track_finished.set()

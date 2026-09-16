@@ -144,7 +144,7 @@ def _clear_youtube_cooldown() -> None:
 class YouTubeExtractor:
     def __init__(self) -> None:
         self._base_opts: Dict[str, Any] = {
-            "format": "bestaudio[ext=m4a]/bestaudio/best",
+            "format": settings.ytdlp_format,
             "quiet": True,
             "no_warnings": False,
             "noplaylist": True,
@@ -231,7 +231,7 @@ class YouTubeExtractor:
                 f"{info.get('title')!r}"
             )
 
-        audio_url = self._pick_audio_url(info)
+        audio_url, stream_headers = self._pick_audio_source(info)
         if not audio_url:
             raise SkippableError(f"No audio URL found for {info.get('title')!r}")
 
@@ -242,6 +242,7 @@ class YouTubeExtractor:
             url=audio_url,
             thumbnail=info.get("thumbnail", ""),
             requested_by=requested_by,
+            stream_headers=stream_headers,
         )
         logger.info(f"Extracted: {track.title!r} ({track.duration})")
         return track
@@ -298,10 +299,12 @@ class YouTubeExtractor:
         search_url = f"ytsearch1:{query}"
         return self.extract_info(search_url, requested_by=requested_by)
 
-    def _pick_audio_url(self, info: Dict[str, Any]) -> Optional[str]:
+    def _pick_audio_source(self, info: Dict[str, Any]) -> tuple[Optional[str], Dict[str, str]]:
+        """Return the resolved URL and headers needed to open it with FFmpeg."""
+        fallback_headers = self._normalise_headers(info.get("http_headers", {}))
         url = info.get("url")
         if url:
-            return url
+            return url, fallback_headers
         formats = info.get("formats") or []
         # First try audio-only formats
         audio_formats = [
@@ -314,7 +317,10 @@ class YouTubeExtractor:
                 key=lambda f: f.get("abr") or f.get("tbr") or 0,
                 reverse=True,
             )
-            return best[0]["url"]
+            selected = best[0]
+            return selected["url"], self._normalise_headers(
+                selected.get("http_headers") or fallback_headers
+            )
         # Fallback: any format with audio (ios client uses muxed audio+video)
         # Prefer formats with audio bitrate
         mixed_formats = [
@@ -327,12 +333,27 @@ class YouTubeExtractor:
                 key=lambda f: (f.get("abr") or 0, f.get("height") or 0),
                 reverse=True,
             )
-            return best[0]["url"]
+            selected = best[0]
+            return selected["url"], self._normalise_headers(
+                selected.get("http_headers") or fallback_headers
+            )
         # Last resort: any format with a URL
         for f in formats:
             if f.get("url"):
-                return f["url"]
-        return None
+                return f["url"], self._normalise_headers(
+                    f.get("http_headers") or fallback_headers
+                )
+        return None, fallback_headers
+
+    @staticmethod
+    def _normalise_headers(headers: Any) -> Dict[str, str]:
+        if not isinstance(headers, dict):
+            return {}
+        return {
+            str(name): str(value)
+            for name, value in headers.items()
+            if name and value is not None
+        }
 
     @staticmethod
     def _raise_for_message(msg: str, url: str) -> None:

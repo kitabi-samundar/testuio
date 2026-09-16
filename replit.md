@@ -54,6 +54,17 @@ iOS AVFoundation cannot use the Icecast ICY protocol on port 8000. A `/stream` p
 - The iOS-friendly stream mount was added to `icecast-replit.xml` with a larger `burst-size` and `client-timeout` to reduce rebuffering on mobile networks.
 - YouTube cookies can be supplied directly via the `YOUTUBE_COOKIES` secret using the raw Netscape `cookies.txt` contents. `YOUTUBE_COOKIES_B64` remains supported for compatibility.
 
+## Streaming flow
+
+`POST /play` accepts either a YouTube URL or a search query. yt-dlp resolves
+the source without downloading it, keeps the source request headers with the
+queued track, and FFmpeg opens the direct URL with those headers using
+real-time decoding and reconnect options. FFmpeg decodes each track to PCM;
+the persistent encoder transcodes that PCM to MP3 and keeps one Icecast
+connection open across track changes. AutoDJ repeats configured playlist URLs
+and falls back to a short generated silence track when a source is temporarily
+unavailable.
+
 ## Pointers
 
 - See `radio-backend/README.md` (original) for full API documentation and troubleshooting.
