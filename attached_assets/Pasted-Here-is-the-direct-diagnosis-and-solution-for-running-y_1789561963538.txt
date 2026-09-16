@@ -1,0 +1,154 @@
+Here is the direct diagnosis and solution for running `yt-dlp` audio extraction on **Railway**:
+
+---
+
+### 1. Why `yt-dlp` gets HTTP 429 on Railway
+
+YouTube actively flags and rate-limits/blocks datacenter/hosting IP ranges (AWS, GCP, Hetzner, OVH, Railway, DigitalOcean, etc.).
+- When Railway’s IP range makes requests to YouTube without credentials:
+  1. YouTube immediately returns **HTTP 429 (Too Many Requests)** or **Sign in to confirm you're not a bot**.
+  2. The clients (`web`, `mweb`, `ios`) are blocked or require Proof-of-Origin (**PO Tokens** / Botguard).
+  3. Formats fail to decipher because YouTube demands a cryptographic `n`-challenge or player JavaScript solver that is rejected without legitimate browser tokens or session proofs.
+
+---
+
+### 2. Are Brave or local browser cookies involved in the Railway failure?
+
+**No.** 
+- The Railway container is a headless Linux container with no graphical interface, no local desktop profiles, and no access to your Windows machine's storage.
+- If your Railway environment or code attempts `cookiesfrombrowser: ("brave",)`, it will fail because Brave does not exist in the container.
+- Any mention of `Brave` in your Railway setup should be completely removed.
+
+---
+
+### 3. Can YouTube extraction work reliably on Railway WITHOUT cookies?
+
+**No, not directly without either cookies or residential/rotating proxies.**
+- Without authentication (cookies, OAuth) or an unflagged residential IP, YouTube blocks 95%+ of server-side requests originating from public cloud providers like Railway.
+- Even if an occasional video plays via mobile API emulation, it will fail within a few tracks due to rapid IP-level throttling.
+
+---
+
+### 4. Will removing `tv_embedded`, enabling Node/EJS, or changing formats fix it?
+
+- **Removing `tv_embedded`**: Yes, you **must** remove this. YouTube completely deprecated and blocked the `tv_embedded` client in recent backend updates (hence `WARNING Skipping unsupported client "tv_embedded"`).
+- **Node / JS challenge solving**: `yt-dlp` needs a JS engine to solve `n`-signature challenges. Installing `nodejs` or `phantomjs` into your Docker container is necessary to solve `n` challenges, but **by itself, it does NOT bypass the datacenter IP 429 block**.
+- **Audio format selection**: Switching between `ba`, `ba/b`, `bestaudio`, or `251` (Opus) will not solve the 429 block because YouTube denies the video metadata before format streams are even evaluated.
+
+---
+
+### 5. Extraction Strategy: What is necessary to solve it?
+
+To make YouTube audio extraction work 24/7 on Railway, you have two viable options:
+
+#### Best & Free Option: YouTube Cookies String via Railway Environment Variable
+Export your cookies from your personal browser (Chrome, Edge, Firefox) using an extension into Netscape format, and pass the text directly as an environment variable in Railway. Your container writes it to a temporary file at runtime.
+
+#### Alternative Option: Residential Proxy
+Route `yt-dlp` requests through an external HTTP/SOCKS5 residential proxy (`--proxy http://user:pass@proxy:port`).
+
+---
+
+### 6. Exact Code Changes & Railway Configuration
+
+Since your deployment uses **`radio-backend/`**, here are the exact changes:
+
+#### Step A: Update `radio-backend/Dockerfile`
+Ensure `nodejs` and `ffmpeg` are installed so `yt-dlp` can execute player JavaScript challenges:
+
+```dockerfile
+FROM python:3.11-slim
+
+# Install ffmpeg and nodejs (required by yt-dlp to solve JS n-challenges)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    nodejs \
+    curl \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -U pip yt-dlp -r requirements.txt
+
+COPY . .
+
+CMD ["python", "main.py"]
+```
+
+---
+
+#### Step B: Update `yt-dlp` Client Configuration in `radio-backend/`
+
+Update your extractor function to:
+1. Load cookies from a Railway environment variable `YOUTUBE_COOKIES_TEXT`.
+2. Use modern, supported clients (`ios`, `android`, `web`).
+3. Set the JS interpreter to `node`.
+
+```python
+import os
+import tempfile
+import yt_dlp
+
+COOKIE_PATH = None
+
+# If cookies were supplied as an environment variable on Railway, write to a temp file
+cookies_text = os.getenv("YOUTUBE_COOKIES_TEXT", "").strip()
+if cookies_text:
+    tmp = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt")
+    tmp.write(cookies_text)
+    tmp.close()
+    COOKIE_PATH = tmp.name
+
+
+def get_ytdlp_options():
+    options = {
+        "format": "bestaudio/best",
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": False,
+        "default_search": "ytsearch1",
+        "socket_timeout": 20,
+        "retries": 3,
+        "cachedir": False,
+        # Use supported clients: android and ios are less aggressive with botguard
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "ios", "web"],
+                "player_skip": ["configs"],
+            }
+        },
+    }
+
+    if COOKIE_PATH and os.path.exists(COOKIE_PATH):
+        options["cookiefile"] = COOKIE_PATH
+
+    # If you ever use a proxy on Railway:
+    proxy = os.getenv("HTTP_PROXY") or os.getenv("PROXY_URL")
+    if proxy:
+        options["proxy"] = proxy
+
+    return options
+
+
+def extract_stream(query: str):
+    with yt_dlp.YoutubeDL(get_ytdlp_options()) as ydl:
+        info = ydl.extract_info(query, download=False)
+        if "entries" in info:
+            info = next((e for e in info["entries"] if e), None)
+        return info
+```
+
+---
+
+#### Step C: Add Railway Environment Variable
+
+1. On your PC (in Chrome, Edge, or Firefox), install **Get cookies.txt LOCALLY**.
+2. Open YouTube, log in, click the extension, and click **Export**.
+3. In your **Railway Dashboard**:
+   - Go to your service → **Variables**.
+   - Add a new variable: `YOUTUBE_COOKIES_TEXT`.
+   - Paste the entire raw content of the exported file into the value field.
+   - Click **Save / Deploy**.
+
+Once Railway redeploys with Node installed in the container and the cookie variable present, the 429 blocks will stop, `yt-dlp` will successfully resolve the stream URLs, and your Icecast radio will broadcast real audio instead of silence.
