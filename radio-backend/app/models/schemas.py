@@ -31,6 +31,13 @@ class TrackInfo(BaseModel):
     url: str
     thumbnail: str
     requested_by: str = "API"
+    # Transport headers are required when FFmpeg opens the resolved YouTube
+    # CDN URL, but must not be returned in API responses.
+    stream_headers: dict[str, str] = Field(
+        default_factory=dict,
+        exclude=True,
+        repr=False,
+    )
 
 
 class NowPlayingResponse(BaseModel):
