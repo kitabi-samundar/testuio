@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: radio-backend
+    env: docker
+    dockerfilePath: radio-backend/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: LOG_LEVEL
+        value: INFO
+      - key: LOG_DIR
+        value: /app/logs
+      - key: ICECAST_HOST
+        value: localhost
+      - key: ICECAST_PORT
+        value: "8000"
+      - key: ICECAST_USER
+        value: source
+      - key: ICECAST_MOUNT
+        value: /stream
+      - key: AUTODJ_PLAYLISTS
+        value: https://youtube.com/playlist?list=PLDIoUOhQQPlXzhp-83rECoLaV6BwFtNC4
+      - key: AUTODJ_SHUFFLE
+        value: "true"
+      - key: AUTODJ_ENABLED
+        value: "true"
+      - key: AUDIO_BITRATE
+        value: "128"
+    disk:
+      name: logs
+      mountPath: /app/logs
+      sizeGB: 1
