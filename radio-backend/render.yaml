@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: radio-backend
+    env: docker
+    repo: https://github.com/YOUR-USERNAME/radio-backend
+    branch: main
+    dockerfilePath: Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: LOG_LEVEL
+        value: INFO
+      - key: AUTODJ_ENABLED
+        value: true
+      - key: ICECAST_HOST
+        value: localhost
+      - key: ICECAST_PORT
+        value: "8000"
+      - key: AUTODJ_PLAYLISTS
+        value: your_youtube_playlist_urls_here
+    disk:
+      name: logs
+      mountPath: /app/logs
+      sizeGB: 1
