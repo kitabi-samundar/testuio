@@ -1,22 +1,36 @@
+# Render is configured to build this service from the Dockerfile, which uses
+# python:3.12-slim as its base image. Pinning the runtime here prevents Render
+# from defaulting to a newer Python version (e.g. 3.14) that is incompatible
+# with native wheels like pydantic-core.
 services:
   - type: web
     name: radio-backend
     env: docker
-    repo: https://github.com/YOUR-USERNAME/radio-backend
-    branch: main
+    # The Dockerfile already defines the build; this just confirms to Render
+    # that it should use Docker mode rather than auto-detecting a Python env.
     dockerfilePath: Dockerfile
     healthCheckPath: /health
     envVars:
       - key: LOG_LEVEL
         value: INFO
-      - key: AUTODJ_ENABLED
-        value: true
+      - key: LOG_DIR
+        value: /app/logs
       - key: ICECAST_HOST
         value: localhost
       - key: ICECAST_PORT
         value: "8000"
+      - key: ICECAST_USER
+        value: source
+      - key: ICECAST_MOUNT
+        value: /stream
       - key: AUTODJ_PLAYLISTS
-        value: your_youtube_playlist_urls_here
+        value: https://youtube.com/playlist?list=PLDIoUOhQQPlXzhp-83rECoLaV6BwFtNC4
+      - key: AUTODJ_SHUFFLE
+        value: "true"
+      - key: AUTODJ_ENABLED
+        value: "true"
+      - key: AUDIO_BITRATE
+        value: "128"
     disk:
       name: logs
       mountPath: /app/logs
