@@ -1,13 +1,12 @@
-# Render is configured to build this service from the Dockerfile, which uses
-# python:3.12-slim as its base image. Pinning the runtime here prevents Render
-# from defaulting to a newer Python version (e.g. 3.14) that is incompatible
-# with native wheels like pydantic-core.
+# Render (root render.yaml points here):
+#   env: docker, dockerfilePath: radio-backend/Dockerfile
+#
+# Railway (this file):
+#   Uses radio-backend/railway.json which also points to Dockerfile
 services:
   - type: web
     name: radio-backend
     env: docker
-    # The Dockerfile already defines the build; this just confirms to Render
-    # that it should use Docker mode rather than auto-detecting a Python env.
     dockerfilePath: Dockerfile
     healthCheckPath: /health
     envVars:
